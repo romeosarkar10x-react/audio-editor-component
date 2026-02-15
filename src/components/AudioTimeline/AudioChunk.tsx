@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Peaks, { type PeaksInstance, type PeaksOptions } from "peaks.js";
 import { audioContext } from "@/lib/utils/audio/context";
+import { MyAudioPlayer } from "@/lib/utils/audio/MyAudioPlayer";
 import { cn } from "@/lib/utils/cn";
 import type { AudioChunkData } from "./types";
 
@@ -17,13 +18,14 @@ interface AudioChunkProps {
 /**
  * Renders a single audio chunk card with a Peaks.js overview waveform.
  *
- * Each chunk creates its own hidden <audio> element and Peaks instance
- * so that multiple waveforms can coexist independently on the timeline.
+ * Each chunk creates its own hidden <audio> element, wraps it in a
+ * MyAudioPlayer adapter, decodes the audio to an AudioBuffer, and
+ * passes both to Peaks.js for overview-only waveform rendering.
  */
 export default function AudioChunk({ chunk, pixelsPerSecond, isDragging, onMouseDown }: AudioChunkProps) {
     const overviewRef = useRef<HTMLDivElement | null>(null);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
     const peaksRef = useRef<PeaksInstance | null>(null);
+    const playerRef = useRef<MyAudioPlayer | null>(null);
     const [ready, setReady] = useState(false);
 
     const width = chunk.durationSeconds * pixelsPerSecond;
@@ -35,41 +37,58 @@ export default function AudioChunk({ chunk, pixelsPerSecond, isDragging, onMouse
         const container = overviewRef.current;
         if (!container) return;
 
-        // Create a dedicated <audio> element for this chunk.
-        const audio = new Audio(chunk.audioUrl);
-        audio.crossOrigin = "anonymous";
-        audio.preload = "auto";
-        audioRef.current = audio;
+        let cancelled = false;
 
-        const options: PeaksOptions = {
-            axisTopMarkerHeight: 0,
-            axisBottomMarkerHeight: 0,
-            overview: {
-                container,
-                waveformColor: "rgba(139, 92, 246, 0.7)",
-                playedWaveformColor: "rgba(168, 128, 255, 0.9)",
-                showAxisLabels: false,
-            },
-            mediaElement: audio,
-            webAudio: {
-                audioContext: audioContext,
-            },
-        };
+        (async () => {
+            // Create a dedicated <audio> element for this chunk.
+            const audio = new Audio(chunk.audioUrl);
+            audio.crossOrigin = "anonymous";
+            audio.preload = "auto";
 
-        Peaks.init(options, (err, instance) => {
-            if (err || !instance) {
-                console.error(`Peaks init error for "${chunk.label}":`, err);
-                return;
-            }
-            peaksRef.current = instance;
-            setReady(true);
-        });
+            // Wrap in custom player adapter.
+            const player = new MyAudioPlayer(audio);
+            playerRef.current = player;
+
+            // Fetch and decode audio data for waveform rendering.
+            const response = await fetch(chunk.audioUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            if (cancelled) return;
+
+            const options: PeaksOptions = {
+                axisTopMarkerHeight: 0,
+                axisBottomMarkerHeight: 0,
+                overview: {
+                    container,
+                    waveformColor: "rgba(139, 92, 246, 0.7)",
+                    playedWaveformColor: "rgba(168, 128, 255, 0.9)",
+                    showAxisLabels: false,
+                    playheadWidth: 0,
+                },
+                webAudio: {
+                    audioContext,
+                    audioBuffer,
+                },
+                player,
+            };
+
+            Peaks.init(options, (err, instance) => {
+                if (err || !instance) {
+                    console.error(`Peaks init error for "${chunk.label}":`, err);
+                    return;
+                }
+                peaksRef.current = instance;
+                setReady(true);
+            });
+        })();
 
         return () => {
+            cancelled = true;
             peaksRef.current?.destroy();
             peaksRef.current = null;
-            audio.pause();
-            audio.src = "";
+            playerRef.current?.destroy();
+            playerRef.current = null;
             setReady(false);
         };
     }, [chunk.audioUrl, chunk.label]);
@@ -109,7 +128,7 @@ export default function AudioChunk({ chunk, pixelsPerSecond, isDragging, onMouse
             </div>
 
             {/* Waveform container */}
-            <div ref={overviewRef} className="h-20 w-full" />
+            <div ref={overviewRef} className="h-20 w-full pointer-events-none" />
         </div>
     );
 }

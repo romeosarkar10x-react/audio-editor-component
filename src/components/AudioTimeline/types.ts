@@ -12,7 +12,7 @@ export interface AudioChunkData {
     audioUrl: string;
     /** Duration of the audio in seconds (loaded dynamically). */
     durationSeconds: number;
-    /** Gap in pixels *before* this chunk. First chunk always has 0. */
+    /** Gap in seconds *before* this chunk (silence). First chunk always has 0. */
     gapBefore: number;
 }
 

@@ -24,6 +24,7 @@ export function useTimelineDrag(
     chunks: AudioChunkData[],
     setChunks: React.Dispatch<React.SetStateAction<AudioChunkData[]>>,
     scrollContainerRef: React.RefObject<HTMLDivElement | null>,
+    pixelsPerSecond: number,
 ) {
     const [dragState, setDragState] = useState<DragState | null>(null);
 
@@ -90,11 +91,13 @@ export function useTimelineDrag(
             mouseXRef.current = e.clientX;
 
             const deltaX = e.clientX - drag.startMouseX;
-            const newGap = Math.max(0, drag.initialGapBefore + deltaX);
+            // Convert pixel delta to seconds since gapBefore is stored in seconds.
+            const deltaSeconds = deltaX / pixelsPerSecond;
+            const newGap = Math.max(0, drag.initialGapBefore + deltaSeconds);
 
             setChunks((prev) => prev.map((c) => (c.id === drag.chunkId ? { ...c, gapBefore: newGap } : c)));
         };
-    }, [setChunks]);
+    }, [setChunks, pixelsPerSecond]);
 
     useEffect(() => {
         handleMouseUpRef.current = () => {

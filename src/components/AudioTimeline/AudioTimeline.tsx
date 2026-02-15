@@ -97,7 +97,7 @@ export default function AudioTimeline() {
     }, []);
 
     // Drag hook.
-    const { dragState, onChunkMouseDown } = useTimelineDrag(chunks, setChunks, scrollContainerRef);
+    const { dragState, onChunkMouseDown } = useTimelineDrag(chunks, setChunks, scrollContainerRef, pixelsPerSecond);
 
     // Total duration label.
     const totalDuration = useMemo(() => chunks.reduce((sum, c) => sum + c.durationSeconds, 0), [chunks]);
@@ -165,7 +165,7 @@ export default function AudioTimeline() {
                     {chunks.map((chunk, i) => (
                         <div key={chunk.id} className="flex shrink-0 items-end">
                             {/* Gap spacer (skip for the first chunk) */}
-                            {i > 0 && <TimelineGap width={chunk.gapBefore} />}
+                            {i > 0 && <TimelineGap width={chunk.gapBefore * pixelsPerSecond} />}
 
                             {/* Audio chunk card */}
                             <AudioChunk

@@ -53,7 +53,7 @@ export default function TimelineRuler({ chunks, pixelsPerSecond }: TimelineRuler
     // ---------------------------------------------------------------
     const contentWidth = useMemo(() => {
         return chunks.reduce((sum, c) => {
-            return sum + c.gapBefore + c.durationSeconds * pixelsPerSecond;
+            return sum + c.gapBefore * pixelsPerSecond + c.durationSeconds * pixelsPerSecond;
         }, 0);
     }, [chunks, pixelsPerSecond]);
 

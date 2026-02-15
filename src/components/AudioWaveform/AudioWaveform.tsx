@@ -1,43 +1,34 @@
 import { useEffect, useRef, useState } from "react";
-import Peaks, { type PeaksInstance, type PeaksOptions } from "peaks.js";
+import Peaks from "peaks.js";
+import type { PeaksInstance, PeaksOptions } from "peaks.js";
 import { audioContext } from "@/lib/utils/audio/context";
-import { Button } from "../ui/button";
-import { Pause, Play } from "lucide-react";
+import type { AudioDataType } from "@/types/AudioData";
 
-export default function AudioWaveform({
-    id,
-    audioInstance,
-    isPlaying,
-    onPlay,
-    onPause,
-}: {
-    id: number;
-    audioInstance: HTMLAudioElement;
-    isPlaying: boolean;
-    onPlay: (id: number) => void;
-    onPause: (id: number) => void;
-}) {
-    const zoomviewContainerRef = useRef<HTMLDivElement | null>(null);
+export default function AudioWaveform({ audioData }: { audioData: AudioDataType }) {
+    const [, setPeaks] = useState<PeaksInstance | null>(null);
     const overviewContainerRef = useRef<HTMLDivElement | null>(null);
-
-    const [peaks, setPeaks] = useState<PeaksInstance | null>(null);
 
     useEffect(() => {
         (async () => {
-            if (!(zoomviewContainerRef.current && overviewContainerRef.current)) {
+            if (!overviewContainerRef.current) {
                 return;
             }
 
             const options: PeaksOptions = {
-                zoomview: { container: zoomviewContainerRef.current },
-                overview: { container: overviewContainerRef.current },
-                mediaElement: audioInstance,
-                webAudio: {
-                    audioContext: audioContext,
+                axisTopMarkerHeight: 0,
+                axisBottomMarkerHeight: 0,
+                overview: {
+                    container: overviewContainerRef.current,
+                    showAxisLabels: false,
+                    waveformColor: "rgba(201, 223, 138, 1)", // #c9df8a with full opacity
+                    playedWaveformColor: "rgba(119, 171, 89, 1)", // #77ab59 with full opacity
+                    playheadWidth: 0,
                 },
-
-                // keyboard: true,
-                // nudgeIncrement: 0.01,
+                webAudio: {
+                    audioContext,
+                    audioBuffer: audioData.buffer,
+                },
+                player: audioData.player,
             };
 
             Peaks.init(options, (err, instance) => {
@@ -48,43 +39,17 @@ export default function AudioWaveform({
 
                 if (instance) {
                     setPeaks(instance);
-                    instance.on("player.playing", (time) => {
-                        console.log("Playing:", time);
-                    });
-                    instance.on("player.timeupdate", (time) => {
-                        console.log("TimeUpdate:", time);
-                    });
-                    instance.on("player.ended", () => {
-                        console.log("ended");
-                    });
                 }
             });
         })();
-    }, [audioInstance, setPeaks]);
-
-    useEffect(() => {
-        if (!peaks) {
-            return;
-        }
-
-        if (isPlaying) {
-            peaks.player.play();
-        } else {
-            peaks.player.pause();
-        }
-    }, [isPlaying]);
+    }, [setPeaks, audioData]);
 
     return (
         <>
-            <div className="flex gap-2 items-center">
-                <Button size="sm" onClick={() => (isPlaying ? onPause : onPlay)(id)}>
-                    {isPlaying ? <Pause /> : <Play />}
-                </Button>
-                <div className="border-border border w-120 rounded-md p-1">
-                    <div ref={zoomviewContainerRef} className="peaks_zoomview_container  h-24"></div>
-                    <div ref={overviewContainerRef} className="peaks_overview_container  h-8 border-t-2"></div>
-                </div>
-            </div>
+            <div
+                ref={overviewContainerRef}
+                className="peaks_overview_container h-24 w-120 border-border border rounded-md pointer-events-none"
+            ></div>
         </>
     );
 }
